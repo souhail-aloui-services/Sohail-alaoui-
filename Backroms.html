@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>Backrooms</title>
+<style>
+body {
+  margin: 0;
+  background: #e5d69a;
+  overflow: hidden;
+  font-family: Arial;
+}
+.room {
+  width: 100vw;
+  height: 100vh;
+  background: 
+    linear-gradient(90deg, rgba(0,0,0,.1) 50%, transparent 50%) 0 0 / 100px 100px,
+    linear-gradient(rgba(0,0,0,.1) 50%, transparent 50%) 0 0 / 100px 100px,
+    #e5d69a;
+  animation: flicker 4s infinite;
+}
+h1 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 80px;
+  text-shadow: 0 0 20px #fff;
+  letter-spacing: 5px;
+}
+@keyframes flicker {
+ 0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.2); }
+  52% { filter: brightness(0.3); }
+ 54% { filter: brightness(1); }
+}
+</style>
+</head>
+<body>
+<div class="room"></div>
+<h1>Backrooms</h1>
+</body>
+</html>
