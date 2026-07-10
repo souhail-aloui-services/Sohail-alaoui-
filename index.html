@@ -2,33 +2,24 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>منزل Backrooms المهجور</title>
+<title>منزل Backrooms المهجور - نسخة كاملة</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <style>
-body{margin:0;overflow:hidden;background:#000;touch-action:none;filter:sepia(0.3) brightness(0.9) contrast(1.15)}
-#info{position:absolute;top:10px;width:100%;text-align:center;color:#ffffaa;font-family:Arial;font-size:18px;font-weight:bold;text-shadow:0 0 8px #000}
-#warning{display:none;position:absolute;top:35%;width:100%;text-align:center;color:#ff0000;font-size:40px;font-family:Arial;font-weight:bold;text-shadow:0 0 20px #ff0000;animation:blink 0.12s infinite}
+body{margin:0;overflow:hidden;background:#000;touch-action:none;filter:sepia(0.3) brightness(0.8) contrast(1.2)}
+#info{position:absolute;top:10px;width:100%;text-align:center;color:#ffffaa;font-size:18px;font-weight:bold;text-shadow:0 0 8px #000}
+#warning{display:none;position:absolute;top:35%;width:100%;text-align:center;color:#ff0000;font-size:40px;font-weight:bold;text-shadow:0 0 20px #ff0000;animation:blink 0.12s infinite}
 @keyframes blink{50%{opacity:0}}
-.btn{position:absolute;bottom:30px;width:75px;height:75px;font-size:32px;background:rgba(0,0,0,0.5);border:3px solid #666;border-radius:20px;color:#ccc;touch-action:none;user-select:none;box-shadow:0 0 15px rgba(0,0,0,0.8)}
-.btn:active{background:rgba(255,0,0,0.4);border-color:#ff0000}
+.btn{position:absolute;bottom:30px;width:75px;height:75px;font-size:32px;background:rgba(0,0,0,0.6);border:3px solid #666;border-radius:20px;color:#ccc;touch-action:none;user-select:none}
+.btn:active{background:rgba(255,0,0,0.4)}
 #up{bottom:120px;left:5%}
 #down{bottom:30px;left:5%}
 #left{bottom:30px;left:calc(5% + 85px)}
 #right{bottom:30px;left:calc(5% - 85px)}
-#restart{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:30px 60px;font-size:30px;background:#8b0000;color:#fff;border:4px solid #fff;border-radius:20px;z-index:10;cursor:pointer;font-weight:bold}
+#flashBtn{bottom:30px;right:5%; background:rgba(255,255,0,0.2); border-color:#ff0}
+#restart{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:30px 60px;font-size:30px;background:#8b0000;color:#fff;border:4px solid #fff;border-radius:20px;z-index:10;cursor:pointer}
+#inventory{position:absolute;top:50px;right:10px;color:#ff0;font-size:16px;background:rgba(0,0,0,0.5);padding:10px;border-radius:10px}
 
-/* خبينا الشخصية */
-#player-arms { display: none; }
-
-/* دعم الهاتف مقلوب */
-@media screen and (orientation: landscape) {
-.btn { transform: scale(1.2); }
-#up{bottom:80px;left:3%}
-#down{bottom:20px;left:3%}
-#left{bottom:20px;left:calc(3% + 85px)}
-#right{bottom:20px;left:calc(3% - 85px)}
-}
-
+@media screen and (orientation: landscape) {.btn { transform: scale(1.2); }}
 .flash { position:fixed; top:0; left:0; width:100%; height:100%; background:#000; opacity:0; pointer-events:none; z-index:1000 }
 .flash.active { animation:flash 0.1s }
 @keyframes flash { 0%{opacity:0} 50%{opacity:0.9} 100%{opacity:0} }
@@ -36,88 +27,86 @@ body{margin:0;overflow:hidden;background:#000;touch-action:none;filter:sepia(0.3
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
 </head>
 <body>
-<div id="info">منزل مهجور - لا تصدر صوتا</div>
+<div id="info">منزل مهجور - اجمع 3 مفاتيح واهرب</div>
 <div id="warning">⚠️ شيء ما يقترب!! ⚠️</div>
+<div id="inventory">المفاتيح: 0/3</div>
 <div class="flash" id="flash"></div>
 
 <button class="btn" id="up">▲</button>
 <button class="btn" id="left">◀</button>
 <button class="btn" id="down">▼</button>
 <button class="btn" id="right">▶</button>
+<button class="btn" id="flashBtn">💡</button>
 <button id="restart">🔄 إعادة المحاولة</button>
 
 <script type="module">
 import * as THREE from 'three';
 let scene,camera,renderer,monster,gameOver=false;
 let yaw=0,pitch=0;
-const walls=[];
+const walls=[], doors=[], keys=[];
 const ceilingLights = [];
-let beepInterval = null;
+let beepInterval = null, stepInterval = null;
+let flashlightOn = true;
+let keysCollected = 0;
+
+// **نظام الصوت**
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(freq, duration){
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + duration);
+}
+function playStep(){ playSound(80, 0.1); } // صوت خطوة
+function playDoor(){ playSound(200, 0.3); } // صوت باب
+function playKey(){ playSound(800, 0.2); } // صوت مفتاح
 
 function playBeep(speed){
   if(beepInterval) clearInterval(beepInterval);
-  beepInterval = setInterval(()=>{
-    try{
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      osc.frequency.value = 45;
-      osc.connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.25);
-    }catch(e){}
-  }, speed);
+  beepInterval = setInterval(()=>playSound(50, 0.2), speed);
 }
 function stopBeep(){ if(beepInterval) clearInterval(beepInterval); beepInterval = null; }
 
 function makeWallTexture1024(isScary){
   const canvas=document.createElement('canvas'); const ctx=canvas.getContext('2d');
   canvas.width=1024; canvas.height=1024;
-
-  // جدران منزل: ورق حائط قديم + تقشير
   ctx.fillStyle='#e8d8a8'; ctx.fillRect(0,0,1024,1024);
   ctx.strokeStyle='#c8b888'; ctx.lineWidth=1;
   for(let i=0;i<1024;i+=40){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,1024);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(1024,i);ctx.stroke();}
-
-  // بقع رطوبة وبقع ماء
   ctx.fillStyle='rgba(80,60,20,0.25)';
   for(let i=0;i<25;i++){ctx.beginPath();ctx.arc(Math.random()*1024,Math.random()*1024,Math.random()*80+30,0,6.28);ctx.fill();}
-
-  // خدوش وتقشير
-  ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=2;
-  for(let i=0;i<40;i++){ctx.beginPath();ctx.moveTo(Math.random()*1024,Math.random()*1024);ctx.lineTo(Math.random()*1024,Math.random()*1024);ctx.stroke();}
-
   if(isScary){
     ctx.fillStyle='#5a0000'; ctx.font='bold 50px Arial';
-    ctx.fillText('GET OUT', 200, 200); ctx.fillText('RUN', 700, 700);
+    ctx.fillText('GET OUT', 200, 200);
     ctx.fillStyle='rgba(139,0,0,0.6)';
     for(let i=0;i<10;i++) ctx.beginPath(),ctx.arc(Math.random()*1024,Math.random()*1024,Math.random()*40,0,6.28),ctx.fill();
   } else {
     ctx.fillStyle='#8b0000'; ctx.font='bold 80px Arial'; ctx.textAlign='center';
     ctx.fillText('Sohail alaoui 🍁',512,512);
   }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.anisotropy = 16;
-  return tex;
+  const tex = new THREE.CanvasTexture(canvas); tex.anisotropy = 16; return tex;
 }
 
-function makeWoodFloor(){ // أرضية خشبية ديال منزل
+function makeWoodFloor(){
   const canvas=document.createElement('canvas'); const ctx=canvas.getContext('2d');
   canvas.width=1024; canvas.height=1024;
   ctx.fillStyle='#5d4037'; ctx.fillRect(0,0,1024,1024);
   for(let i=0;i<1024;i+=80){
     ctx.fillStyle = i%160===0? '#6d4c41' : '#4e342e';
-    ctx.fillRect(0,i,1024,80);
-    ctx.strokeStyle='#3e2723'; ctx.lineWidth=2; ctx.strokeRect(0,i,1024,80);
+    ctx.fillRect(0,i,1024,80); ctx.strokeStyle='#3e2723'; ctx.lineWidth=2; ctx.strokeRect(0,i,1024,80);
   }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.anisotropy = 16;
-  return tex;
+  const tex = new THREE.CanvasTexture(canvas); tex.anisotropy = 16; return tex;
 }
 
 function initGame(){
   document.body.querySelectorAll('canvas').forEach(c=>c.remove());
-  stopBeep(); gameOver=false;
+  stopBeep(); gameOver=false; keysCollected=0;
   document.getElementById('restart').style.display='none';
   document.getElementById('warning').style.display='none';
+  updateInventory();
 
   scene=new THREE.Scene();
   scene.background=new THREE.Color(0x1a1a0f);
@@ -128,19 +117,19 @@ function initGame(){
   renderer.setSize(innerWidth,innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
   document.body.appendChild(renderer.domElement);
 
-  // إضاءة منزل خافتة
-  scene.add(new THREE.AmbientLight(0xffffcc,0.15));
+  // إضاءة + فلاش لايت
+  const ambient = new THREE.AmbientLight(0xffffcc,0.15);
+  scene.add(ambient);
+  const flashlight = new THREE.SpotLight(0xffffee, 3, 15, Math.PI/6);
+  flashlight.position.set(0,1.6,0); scene.add(flashlight);
+
   for(let x=-60;x<=60;x+=15){
     for(let z=-60;z<=60;z+=15){
-      const isDead = Math.random() < 0.35; // مصابيح اكثر معطلة
+      const isDead = Math.random() < 0.35;
       const light = new THREE.PointLight(0xffffdd, isDead? 0.05 : 2.8, 20);
-      light.position.set(x,2.8,z);
-      light.castShadow = true;
-      scene.add(light);
+      light.position.set(x,2.8,z); light.castShadow = true; scene.add(light);
       ceilingLights.push({light, isDead, flickerTimer: Math.random()*1000});
     }
   }
@@ -152,83 +141,80 @@ function initGame(){
   const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(500,500),new THREE.MeshStandardMaterial({color:0xd0c090}));
   ceiling.rotation.x=Math.PI/2; ceiling.position.y=2.8; scene.add(ceiling);
 
-  walls.length=0;
+  walls.length=0; doors.length=0; keys.length=0;
+
   function addWall(x,z,w,h, scary=false){
     const tex = makeWallTexture1024(scary);
     const m=new THREE.Mesh(new THREE.BoxGeometry(w,2.8,h), new THREE.MeshStandardMaterial({map: tex}));
     m.position.set(x,1.4,z); m.castShadow = true; m.receiveShadow = true; scene.add(m);walls.push(m);
   }
 
-  function addDoor(x,z,rot=0){ // أبواب
+  function addDoor(x,z,rot=0){
     const door=new THREE.Mesh(new THREE.BoxGeometry(1.8,2.2,0.15), new THREE.MeshStandardMaterial({color:0x4e342e}));
-    door.position.set(x,1.1,z); door.rotation.y=rot; door.castShadow=true; scene.add(door);walls.push(door);
+    door.position.set(x,1.1,z); door.rotation.y=rot; door.castShadow=true; door.userData = {isOpen:false};
+    scene.add(door); doors.push(door); walls.push(door);
   }
 
-  function addFurniture(x,z){ // طاولة وكرسي
-    const table=new THREE.Mesh(new THREE.BoxGeometry(2,0.8,1), new THREE.MeshStandardMaterial({color:0x5d4037}));
-    table.position.set(x,0.4,z); table.castShadow=true; scene.add(table);
-    for(let i=0;i<4;i++){ const chair=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.9,0.6), new THREE.MeshStandardMaterial({color:0x3e2723}));
-      chair.position.set(x+Math.cos(i*Math.PI/2)*1.5,0.45,z+Math.sin(i*Math.PI/2)*1.5); chair.castShadow=true; scene.add(chair);
-    }
+  function addKey(x,z){
+    const key=new THREE.Mesh(new THREE.TorusGeometry(0.3,0.1,16,32), new THREE.MeshStandardMaterial({color:0xffd700, emissive:0xffd700}));
+    key.position.set(x,0.5,z); key.castShadow=true; scene.add(key); keys.push(key);
   }
 
-  // **منزل كبير + غرف كثيرة**
-  // الصالة
+  // **المنزل الكبير**
   addWall(0,-5,20,1); addWall(-10,0,1,20); addWall(10,0,1,20);
-  addFurniture(0,5);
   addDoor(-10,8,Math.PI/2); addDoor(10,8,-Math.PI/2);
 
-  // غرفة 1: غرفة نوم
   addWall(-15,10,8,1); addWall(-19,15,1,10); addWall(-15,20,8,1); addWall(-11,15,1,10,true);
-  addDoor(-11,12,-Math.PI/2);
+  addDoor(-11,12,-Math.PI/2); addKey(-15,15); // مفتاح 1
 
-  // غرفة 2: مطبخ
   addWall(15,10,8,1); addWall(19,15,1,10); addWall(15,20,8,1); addWall(11,15,1,10,true);
-  addDoor(11,12,Math.PI/2);
+  addDoor(11,12,Math.PI/2); addKey(15,15); // مفتاح 2
 
-  // ممر طويل
   addWall(0,20,3,1); addWall(-1.5,30,1,20); addWall(1.5,30,1,20);
 
-  // غرفة 3: حمام
-  addWall(-10,35,6,1); addWall(-13,38,1,6); addWall(-10,41,6,1); addWall(-7,38,1,6,true);
-
-  // غرفة 4: غرفة اطفال
-  addWall(10,35,6,1); addWall(13,38,1,6); addWall(10,41,6,1); addWall(7,38,1,6,true);
-
-  // غرفة 5: القبو
   addWall(0,45,10,1); addWall(-5,50,1,10); addWall(0,55,10,1); addWall(5,50,1,10,true);
-  addDoor(-5,48,-Math.PI/2);
+  addDoor(-5,48,-Math.PI/2); addKey(0,50); // مفتاح 3
 
-  // غرفة 6: غرفة سرية مسدودة
-  addWall(20,50,8,1,true); addWall(24,55,1,10,true); addWall(20,60,8,1,true); addWall(16,55,1,10,true);
+  // باب الخروج
+  const exitDoor = new THREE.Mesh(new THREE.BoxGeometry(2,2.5,0.2), new THREE.MeshStandardMaterial({color:0x00ff00}));
+  exitDoor.position.set(0,1.25,56); exitDoor.userData = {isExit:true};
+  scene.add(exitDoor); doors.push(exitDoor); walls.push(exitDoor);
 
-  // الوحش
   monster=new THREE.Mesh(
     new THREE.SphereGeometry(1,16,16),
     new THREE.MeshStandardMaterial({color:0x000, emissive:0xff0000, emissiveIntensity:6})
   );
   monster.position.set(0,1,52); monster.castShadow = true; scene.add(monster);
-  const monsterLight = new THREE.PointLight(0xff0000,6,18); monster.add(monsterLight);
 
   camera.position.set(0,1.6,0);
   yaw=0; pitch=0;
-  animate();
+  animate(ambient, flashlight);
 }
 
 let move={u:0,d:0,l:0,r:0};
 ['up','down','left','right'].forEach((k,i)=>{
   const btn=document.getElementById(k);
   const key=['u','d','l','r'][i];
-  const start=()=>{move[key]=1;}
-  const end=()=>{move[key]=0;}
-  btn.addEventListener('touchstart',e=>{e.preventDefault();start()});
+  const start=()=>{
+    move[key]=1;
+    if(!stepInterval) stepInterval = setInterval(playStep, 400); // صوت خطوات
+  }
+  const end=()=>{
+    move[key]=0;
+    if(!move.u &&!move.d &&!move.l &&!move.r){ clearInterval(stepInterval); stepInterval=null; }
+  }
+  btn.addEventListener('touchstart',e=>{e.preventDefault();audioCtx.resume();start()});
   btn.addEventListener('touchend',e=>{e.preventDefault();end()});
-  btn.addEventListener('touchcancel',e=>{e.preventDefault();end()});
 });
+
+document.getElementById('flashBtn').onclick = () => {
+  flashlightOn =!flashlightOn;
+  document.getElementById('flashBtn').style.background = flashlightOn? 'rgba(255,255,0,0.4)' : 'rgba(0,0,0,0.6)';
+}
 
 let isDragging=false, lastX=0, lastY=0;
 document.addEventListener('touchstart',e=>{
-  if(e.touches.length===1 &&!e.target.classList.contains('btn') && e.target.id!=='restart'){
+  if(e.touches.length===1 &&!e.target.classList.contains('btn')){
     isDragging=true; lastX=e.touches[0].clientX; lastY=e.touches[0].clientY;
   }
 });
@@ -241,26 +227,30 @@ document.addEventListener('touchmove',e=>{
   }
 });
 document.addEventListener('touchend',()=>{isDragging=false});
-
 document.getElementById('restart').onclick=()=>{initGame()};
 
-function animate(){
+function updateInventory(){
+  document.getElementById('inventory').innerText = `المفاتيح: ${keysCollected}/3`;
+}
+
+function animate(ambient, flashlight){
   if(gameOver) return;
-  requestAnimationFrame(animate);
-  const speed=0.09;
+  requestAnimationFrame(()=>animate(ambient, flashlight));
+  const isRunning = move.u||move.d||move.l||move.r;
+  const speed = isRunning? 0.12 : 0.08; // الوحش يسمع الجري
+
+  // الفلاش لايت
+  flashlight.visible = flashlightOn;
+  flashlight.position.copy(camera.position);
+  flashlight.target.position.copy(camera.position).add(new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), yaw));
+  flashlight.target.updateMatrixWorld();
+
+  ambient.intensity = flashlightOn? 0.15 : 0.05;
 
   ceilingLights.forEach(obj=>{
-    if(obj.isDead){
-      obj.light.intensity = Math.random() < 0.008? 1.2 : 0.03;
-    } else {
-      obj.light.intensity = 2.6 + Math.sin(Date.now()*0.004 + obj.flickerTimer)*0.6;
-    }
+    if(obj.isDead){ obj.light.intensity = Math.random() < 0.008? 1.2 : 0.03; }
+    else { obj.light.intensity = 2.6 + Math.sin(Date.now()*0.004 + obj.flickerTimer)*0.6; }
   });
-
-  if(Math.random() < 0.003){
-    document.getElementById('flash').classList.add('active');
-    setTimeout(()=>document.getElementById('flash').classList.remove('active'), 100);
-  }
 
   const forward = new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
   const right = new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
@@ -271,31 +261,55 @@ function animate(){
   if(move.r) newPos.addScaledVector(right, speed);
 
   let collision=false;
-  walls.forEach(w=>{if(new THREE.Box3().setFromObject(w).containsPoint(newPos))collision=true;});
+  walls.forEach(w=>{
+    if(w.userData.isOpen) return; // الباب المفتوح ما يديرش تصادم
+    if(new THREE.Box3().setFromObject(w).containsPoint(newPos))collision=true;
+  });
   if(!collision)camera.position.copy(newPos);
 
-  if(move.u||move.d||move.l||move.r) camera.position.y = 1.6 + Math.sin(Date.now()*0.02)*0.02;
+  // التفاعل مع الأبواب والمفاتيح
+  doors.forEach(door=>{
+    if(camera.position.distanceTo(door.position) < 2.5){
+      if(door.userData.isExit && keysCollected >= 3){
+        document.getElementById('info').innerText='هنيئا! لقد هربت!';
+        document.getElementById('restart').style.display='block';
+        gameOver=true;
+      }
+      if(!door.userData.isOpen){
+        door.userData.isOpen = true;
+        door.rotation.y += Math.PI/2;
+        playDoor();
+      }
+    }
+  });
 
+  keys.forEach((key,i)=>{
+    if(camera.position.distanceTo(key.position) < 2){
+      scene.remove(key); keys.splice(i,1);
+      keysCollected++; playKey(); updateInventory();
+    }
+  });
+
+  // الوحش اذكى: كيجري منين كتجري
+  const monsterSpeed = isRunning? 0.12 : 0.07;
   const dir = camera.position.clone().sub(monster.position).normalize();
-  monster.position.addScaledVector(dir, 0.08);
+  monster.position.addScaledVector(dir, monsterSpeed);
   monster.lookAt(camera.position);
 
   const dist = monster.position.distanceTo(camera.position);
-  const warning = document.getElementById('warning');
-
   if(dist < 12){
-    warning.style.display='block';
+    document.getElementById('warning').style.display='block';
     if(dist < 5) playBeep(110); else playBeep(350);
   } else {
-    warning.style.display='none';
+    document.getElementById('warning').style.display='none';
     stopBeep();
   }
 
   if(dist<1.8){
     document.getElementById('info').innerText='تم القبض عليك!!';
     document.getElementById('restart').style.display='block';
-    warning.style.display='none';
-    stopBeep();
+    document.getElementById('warning').style.display='none';
+    stopBeep(); clearInterval(stepInterval);
     gameOver=true;
   }
 
