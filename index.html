@@ -1,152 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Horror 3D Mobile</title>
+<title>MyPoints - اربح نقاط</title>
 <style>
-  body { margin: 0; background: #050505; overflow: hidden; }
-  #ui { position: absolute; top: 10px; left: 10px; color: #ff0000; font-size: 18px; text-shadow: 0 0 5px #ff0000; z-index: 10; }
-  #joystick { position: absolute; bottom: 80px; left: 30px; width: 100px; height: 100px; background: rgba(255,255,255,0.1); border-radius: 50%; z-index: 10; }
-  #joystickKnob { position: absolute; width: 40px; height: 40px; background: rgba(255,255,255,0.3); border-radius: 50%; top: 30px; left: 30px; }
-  #look { position: absolute; bottom: 80px; right: 30px; width: 100px; height: 100px; background: rgba(255,0,0,0.1); border-radius: 50%; z-index: 10; }
-  #instructions { position: absolute; bottom: 10px; width: 100%; text-align: center; color: #aaa; font-size: 12px; z-index: 10;}
+  body{background:#0a0a0a; color:#fff; font-family:Arial; text-align:center;}
+  .box{background:#1a1a1a; padding:20px; margin:20px; border-radius:10px;}
+  button{background:#ff0000; color:#fff; border:0; padding:10px 20px; border-radius:5px; cursor:pointer;}
+  #points{font-size:30px; color:#00ff00;}
 </style>
-<script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-  }
-}
-</script>
 </head>
 <body>
-<div id="ui">Health: <span id="health">100</span> | Keys: <span id="keys">0/3</span></div>
-<div id="joystick"><div id="joystickKnob"></div></div>
-<div id="look"></div>
-<div id="instructions">حرك الجوستيك للحركة | حرك الدائرة الحمراء للنظر</div>
+<h1>🎁 MyPoints</h1>
 
-<script type="module">
-import * as THREE from 'three';
+<div class="box">
+  <h2>رصيدك: <span id="points">0</span> نقطة</h2>
+  <button onclick="claimBonus()">+100 نقطة تسجيل اليوم</button>
+</div>
 
-// 1. المشهد والكاميرا
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x050505);
-scene.fog = new THREE.Fog(0x000000, 5, 25); // ضباب أخف باش يبان
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({antialias: true});
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+<div class="box">
+  <h2>المهام</h2>
+  <p>تحميل تطبيق +500 نقطة</p>
+  <button onclick="addPoints(500)">إكمال المهمة</button>
+  <p>استبيان +200 نقطة</p>
+  <button onclick="addPoints(200)">إكمال المهمة</button>
+</div>
 
-// 2. إضاءة قوية باش ما يكونش كحل
-const light1 = new THREE.PointLight(0xddaa88, 3, 20); // ضوء برتقالي مرعب
-light1.position.set(0, 3, 0);
-scene.add(light1);
-const light2 = new THREE.AmbientLight(0x221111, 0.5); // ضوء خفيف
-scene.add(light2);
+<div class="box">
+  <h2>المتجر</h2>
+  <p>اشتراك Free Fire 1000 نقطة</p>
+  <button onclick="buy(1000)">اشتري</button>
+  <p>رصيد PayPal $5 = 5000 نقطة</p>
+  <button onclick="buy(5000)">اشتري</button>
+</div>
 
-// 3. الأرض والحوائط
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({color: 0x111}));
-floor.rotation.x = -Math.PI/2;
-floor.receiveShadow = true;
-scene.add(floor);
+<script>
+let points = localStorage.getItem('points') || 0;
+document.getElementById('points').innerText = points;
 
-const walls = [];
-const wallMat = new THREE.MeshStandardMaterial({color: 0x333333});
-for(let i=0; i<30; i++){
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), wallMat);
-  wall.position.set(Math.random()*40-20, 1.5, Math.random()*40-20);
-  wall.castShadow = true;
-  scene.add(wall);
-  walls.push(wall);
+function addPoints(p){
+  points = parseInt(points) + p;
+  localStorage.setItem('points', points);
+  document.getElementById('points').innerText = points;
+  alert("مبروك +"+p+" نقطة");
 }
 
-// 4. المفاتيح
-const keys = [];
-const keyMat = new THREE.MeshStandardMaterial({color: 0xffff00, emissive: 0xffff00});
-for(let i=0; i<3; i++){
-  const key = new THREE.Mesh(new THREE.SphereGeometry(0.3), keyMat);
-  key.position.set(Math.random()*20-10, 1, Math.random()*20-10);
-  scene.add(key);
-  keys.push(key);
+function claimBonus(){
+  addPoints(100);
 }
 
-// 5. الوحش
-const monster = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 2), new THREE.MeshStandardMaterial({color: 0x880000, emissive: 0x440000}));
-monster.position.set(10, 1, 10);
-scene.add(monster);
-
-// 6. التحكم بالموبايل
-let moveX = 0, moveZ = 0, lookX = 0, lookY = 0;
-let health = 100, collectedKeys = 0;
-camera.position.set(0, 2, 5);
-
-// جوستيك الحركة
-const joy = document.getElementById('joystick');
-const knob = document.getElementById('joystickKnob');
-joy.addEventListener('touchmove', (e) => {
-  const touch = e.touches[0];
-  const rect = joy.getBoundingClientRect();
-  let x = touch.clientX - rect.left - 50;
-  let y = touch.clientY - rect.top - 50;
-  const dist = Math.min(30, Math.sqrt(x*x + y*y));
-  const angle = Math.atan2(y, x);
-  knob.style.left = 50 + Math.cos(angle)*dist - 20 + 'px';
-  knob.style.top = 50 + Math.sin(angle)*dist - 20 + 'px';
-  moveX = Math.cos(angle) * (dist/30);
-  moveZ = Math.sin(angle) * (dist/30);
-});
-joy.addEventListener('touchend', () => { moveX=0; moveZ=0; knob.style.left='30px'; knob.style.top='30px'; });
-
-// النظر
-const lookArea = document.getElementById('look');
-lookArea.addEventListener('touchmove', (e) => {
-  const touch = e.touches[0];
-  lookX = (touch.clientX - window.innerWidth/2) * 0.002;
-  lookY = (touch.clientY - window.innerHeight/2) * 0.002;
-});
-
-// 7. حلقة اللعبة
-function animate(){
-  requestAnimationFrame(animate);
-
-  // حركة الكاميرا
-  camera.position.x += moveX * 0.1;
-  camera.position.z += moveZ * 0.1;
-  camera.rotation.y += lookX;
-  camera.rotation.x += lookY;
-  camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x)); // منع الدوران 360
-
-  // حركة الوحش
-  monster.lookAt(camera.position);
-  monster.position.add(monster.getWorldDirection(new THREE.Vector3()).multiplyScalar(0.05));
-
-  // التصادم
-  if(monster.position.distanceTo(camera.position) < 1.5){
-    health -= 1;
-    document.getElementById('health').innerText = health;
+function buy(cost){
+  if(points >= cost){
+    points = points - cost;
+    localStorage.setItem('points', points);
+    document.getElementById('points').innerText = points;
+    alert("تم الشراء! غادي نتواصل معاك");
+  }else{
+    alert("النقاط غير كافية");
   }
-
-  // جمع المفاتيح
-  keys.forEach((key, i) => {
-    key.rotation.y += 0.05;
-    if(key.visible && key.position.distanceTo(camera.position) < 1.5){
-      key.visible = false;
-      collectedKeys++;
-      document.getElementById('keys').innerText = `${collectedKeys}/3`;
-    }
-  });
-
-  renderer.render(scene, camera);
 }
-animate();
-
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
 </script>
 </body>
 </html>
