@@ -1,222 +1,184 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Backrooms Corridor</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: Arial; }
-        canvas { display: block; }
-        #ui {
-            position: absolute; top: 20px; left: 20px; color: #d4c45a;
-            font-size: 20px; text-shadow: 2px 2px 4px #000;
-        }
-        #controls {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            display: grid; grid-template-columns: 60px 60px 60px; gap: 10px;
-        }
-      .btn {
-            width: 60px; height: 60px; background: rgba(212,196,90,0.3);
-            border: 2px solid #d4c45a; border-radius: 15px; color: #d4c45a;
-            font-size: 24px; cursor: pointer;
-        }
-        #flashBtn {
-            position: absolute; bottom: 30px; right: 30px;
-            width: 70px; height: 70px; border-radius: 50%;
-            background: rgba(255,255,0,0.4); border: 3px solid yellow;
-            font-size: 30px;
-        }
-        #gameover {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-            color: red; font-size: 40px; display: none; text-align: center;
-            background: rgba(0,0,0,0.7); padding: 20px; border-radius: 10px;
-        }
-    </style>
-    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
-    <script type="importmap">
-    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
-    </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Horror 3D - Escape</title>
+<style>
+  body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial'; }
+  #ui { position: absolute; top: 20px; left: 20px; color: #ff0000; font-size: 20px; text-shadow: 0 0 10px #ff0000; }
+  #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; border: 2px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); }
+  #gameOver { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff0000; font-size: 60px; display: none; text-shadow: 0 0 20px #ff0000; }
+  #instructions { position: absolute; bottom: 20px; width: 100%; text-align: center; color: #aaa; }
+</style>
+<script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
 </head>
 <body>
-    <div id="ui">المفاتيح: <span id="keys">0/3</span></div>
-    <div id="controls">
-        <div></div><button class="btn" id="up">▲</button><div></div>
-        <button class="btn" id="left">◀</button><button class="btn" id="down">▼</button><button class="btn" id="right">▶</button>
-    </div>
-    <button id="flashBtn">💡</button>
-    <div id="gameover"></div>
+<div id="ui">Health: <span id="health">100</span> | Keys: <span id="keys">0/3</span></div>
+<div id="crosshair"></div>
+<div id="gameOver">YOU DIED</div>
+<div id="instructions">WASD: Move | Mouse: Look | Click: Lock Mouse | ESC: Unlock</div>
 
 <script type="module">
 import * as THREE from 'three';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
-// 1. الإعدادات
+// 1. الإعدادات الأساسية
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x111111, 8, 20); // ضباب مرعب
+scene.fog = new THREE.FogExp2(0x000000, 0.035); // ضباب مرعب
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-// 2. الإضاءة الخافتة
-const ambient = new THREE.AmbientLight(0xffffaa, 0.15);
-scene.add(ambient);
-const flashlight = new THREE.PointLight(0xffffcc, 2, 12);
-flashlight.position.set(0,1.5,0);
-scene.add(flashlight);
-let flashlightOn = true;
+// 2. الإضاءة المرعبة
+const ambientLight = new THREE.AmbientLight(0x110011, 0.3);
+scene.add(ambientLight);
+const flashLight = new THREE.SpotLight(0xffffcc, 2, 20, Math.PI/4, 0.5);
+flashLight.castShadow = true;
+camera.add(flashLight);
+scene.add(camera);
 
-// 3. أرضية بلاط أزرق وأبيض checker
-const canvas = document.createElement('canvas');
-canvas.width = 128; canvas.height = 128;
-const ctx = canvas.getContext('2d');
-for(let x=0; x<2; x++) for(let y=0; y<2; y++){
-    ctx.fillStyle = (x+y)%2? '#0064C8' : '#F5F5F5'; // أزرق وأبيض
-    ctx.fillRect(x*64, y*64, 64, 64);
+// 3. التحكم FPS
+const controls = new PointerLockControls(camera, document.body);
+document.addEventListener('click', () => controls.lock());
+const velocity = new THREE.Vector3();
+const direction = new THREE.Vector3();
+const keys = {w: false, a: false, s: false, d: false};
+
+// 4. بناء المتاهة المرعبة
+const maze = new THREE.Group();
+const wallMat = new THREE.MeshStandardMaterial({color: 0x222222, roughness: 0.9});
+const floorMat = new THREE.MeshStandardMaterial({color: 0x111111, roughness: 0.8});
+
+for(let x = -10; x <= 10; x++){
+  for(let z = -10; z <= 10; z++){
+    if(Math.random() > 0.6 || x === -10 || x === 10 || z === -10 || z === 10){
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), wallMat);
+      wall.position.set(x*2, 1.5, z*2);
+      wall.castShadow = true;
+      wall.receiveShadow = true;
+      maze.add(wall);
+    }
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), floorMat);
+    floor.rotation.x = -Math.PI/2;
+    floor.position.set(x*2, 0, z*2);
+    floor.receiveShadow = true;
+    maze.add(floor);
+  }
 }
-const tileTexture = new THREE.CanvasTexture(canvas);
-tileTexture.wrapS = tileTexture.wrapT = THREE.RepeatWrapping;
-tileTexture.repeat.set(20,20);
-const floorMat = new THREE.MeshStandardMaterial({map: tileTexture});
+scene.add(maze);
 
-// الأرض + السقف
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(80,80), floorMat);
-floor.rotation.x = -Math.PI/2; scene.add(floor);
-const ceilingMat = new THREE.MeshStandardMaterial({color: 0xD0D0D0});
-const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(80,80), ceilingMat);
-ceiling.rotation.x = Math.PI/2; ceiling.position.y = 3; scene.add(ceiling);
-
-// 4. بناء الممرات الطويلة
-const yellowWall = new THREE.MeshStandardMaterial({color: 0xF2E96C}); // أصفر
-const pinkWall = new THREE.MeshStandardMaterial({color: 0xF5A9B8}); // وردي
-const greenWall = new THREE.MeshStandardMaterial({color: 0x7FB069}); // أخضر لتحت
-const redLine = new THREE.MeshStandardMaterial({color: 0xC0392B}); // خط أحمر
-
-for(let z = -40; z < 40; z += 5){
-    // الجدار الأيمن أصفر
-    const wallR = new THREE.Mesh(new THREE.BoxGeometry(0.3,3,5), yellowWall);
-    wallR.position.set(2,1.5,z); scene.add(wallR);
-
-    // الجدار الأيسر وردي
-    const wallL = new THREE.Mesh(new THREE.BoxGeometry(0.3,3,5), pinkWall);
-    wallL.position.set(-2,1.5,z); scene.add(wallL);
-
-    // الخط الأخضر لتحت
-    const baseL = new THREE.Mesh(new THREE.BoxGeometry(0.31,0.5,5), greenWall);
-    baseL.position.set(-2,0.25,z); scene.add(baseL);
-    const baseR = new THREE.Mesh(new THREE.BoxGeometry(0.31,0.5,5), greenWall);
-    baseR.position.set(2,0.25,z); scene.add(baseR);
-
-    // الخط الأحمر فالوسط
-    const lineR = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.1,5), redLine);
-    lineR.position.set(2,1,z); scene.add(lineR);
-    const lineL = lineR.clone(); lineL.position.x = -2; scene.add(lineL);
-
-    // لمبات فلورسنت فالسقف
-    const light = new THREE.PointLight(0xffffdd, 0.6, 8);
-    light.position.set(0, 2.9, z);
-    scene.add(light);
-}
-
-// 5. ملصقات على الحائط
-function createPoster(text, x, y, z, rotY){
-    const c = document.createElement('canvas'); c.width = 512; c.height = 256;
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = 'white'; ctx.fillRect(0,0,512,256);
-    ctx.fillStyle = 'black'; ctx.font = 'bold 30px Arial'; ctx.textAlign = 'center';
-    text.split('\n').forEach((line,i)=> ctx.fillText(line, 256, 80 + i*35));
-    const texture = new THREE.CanvasTexture(c);
-    const poster = new THREE.Mesh(new THREE.PlaneGeometry(2,1), new THREE.MeshStandardMaterial({map:texture}));
-    poster.position.set(x,y,z); poster.rotation.y = rotY;
-    scene.add(poster);
-}
-
-createPoster("DO TO\nEXIT?\n↑", 2.1, 1.8, -10, -Math.PI/2);
-createPoster("NOT BY\nTHE SOUP\n←", -2.1, 1.8, -5, Math.PI/2);
-createPoster("CAN STOP?\n234", -2.1, 1.2, 0, Math.PI/2);
-createPoster("WAWV GLAD\nTIME", 2.1, 1.2, 5, -Math.PI/2);
-
-// 6. تفاصيل: تلفون + سلة
-const phone = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.3,0.1), new THREE.MeshStandardMaterial({color:0x222}));
-phone.position.set(-1.9,1,10); scene.add(phone);
-const basket = new THREE.Mesh(new THREE.ConeGeometry(0.4,0.3,8), new THREE.MeshStandardMaterial({color:0xFFD700}));
-basket.position.set(0,2.2,-15); basket.rotation.x = Math.PI; scene.add(basket);
-
-// 7. المفاتيح 3
-const keys = [];
+// 5. المفاتيح للهروب
+const keyMeshes = [];
+const keyMat = new THREE.MeshStandardMaterial({color: 0xffdd00, emissive: 0xffdd00});
 for(let i=0; i<3; i++){
-    const key = new THREE.Mesh(new THREE.SphereGeometry(0.3,16,16), new THREE.MeshStandardMaterial({color: 0xffd700, emissive: 0xffd700}));
-    key.position.set(Math.random()*3-1.5, 0.5, Math.random()*60-30);
-    keys.push(key); scene.add(key);
+  const key = new THREE.Mesh(new THREE.TetrahedronGeometry(0.3), keyMat);
+  key.position.set(Math.random()*16-8, 1, Math.random()*16-8);
+  key.castShadow = true;
+  scene.add(key);
+  keyMeshes.push(key);
 }
+
+// 6. الوحش اللي كيجري موراك
+const monster = new THREE.Mesh(
+  new THREE.CapsuleGeometry(0.5, 1.5, 4, 8),
+  new THREE.MeshStandardMaterial({color: 0x550000, emissive: 0x330000})
+);
+monster.position.set(8, 1.25, 8);
+monster.castShadow = true;
+scene.add(monster);
+
+// 7. الصوت المرعب
+const audioListener = new THREE.AudioListener();
+camera.add(audioListener);
+const monsterSound = new THREE.Audio(audioListener);
+// ملاحظة: خاصك تزيد ملف صوت horror.mp3
+// const audioLoader = new THREE.AudioLoader();
+// audioLoader.load('horror.mp3', (buffer) => { monsterSound.setBuffer(buffer); monsterSound.setLoop(true); monsterSound.play(); });
+
+// 8. متغيرات اللعبة
+let health = 100;
 let collectedKeys = 0;
+camera.position.set(0, 2, 0);
 
-// 8. باب الهروب
-const door = new THREE.Mesh(new THREE.BoxGeometry(2,2.5,0.2), new THREE.MeshStandardMaterial({color: 0x8B4513}));
-door.position.set(0,1.25,38); scene.add(door);
+// 9. الحركة والتصادم
+document.addEventListener('keydown', (e) => { if(e.code==='KeyW') keys.w=true; if(e.code==='KeyA') keys.a=true; if(e.code==='KeyS') keys.s=true; if(e.code==='KeyD') keys.d=true; });
+document.addEventListener('keyup', (e) => { if(e.code==='KeyW') keys.w=false; if(e.code==='KeyA') keys.a=false; if(e.code==='KeyS') keys.s=false; if(e.code==='KeyD') keys.d=false; });
 
-// 9. الوحش
-const monster = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), new THREE.MeshStandardMaterial({color: 0x050505}));
-monster.position.set(0,1,-20); scene.add(monster);
+function checkCollision(pos){
+  for(let child of maze.children){
+    if(child.geometry.type === 'BoxGeometry'){
+      if(Math.abs(pos.x - child.position.x) < 1 && Math.abs(pos.z - child.position.z) < 1){
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
-// 10. التحكم
-camera.position.set(0,1.5,0);
-let keys_pressed = {};
-document.addEventListener('keydown', e=> keys_pressed[e.key.toLowerCase()] = true);
-document.addEventListener('keyup', e=> keys_pressed[e.key.toLowerCase()] = false);
-['up','down','left','right'].forEach(id=>{
-    document.getElementById(id).ontouchstart = ()=> keys_pressed[id] = true;
-    document.getElementById(id).ontouchend = ()=> keys_pressed[id] = false;
-});
-document.getElementById('flashBtn').onclick = ()=>{ flashlightOn =!flashlightOn; flashlight.visible = flashlightOn; }
-
-// 11. حلقة اللعبة
-let gameOver = false;
+// 10. حلقة اللعبة
 function animate(){
-    if(gameOver) return;
-    requestAnimationFrame(animate);
-
-    const speed = 0.12;
-    if(keys_pressed['w']||keys_pressed['up']) camera.position.z += speed;
-    if(keys_pressed['s']||keys_pressed['down']) camera.position.z -= speed;
-    if(keys_pressed['a']||keys_pressed['left']) camera.position.x -= speed;
-    if(keys_pressed['d']||keys_pressed['right']) camera.position.x += speed;
-
-    // ما يخرجش من الممر
-    camera.position.x = Math.max(-1.5, Math.min(1.5, camera.position.x));
-    flashlight.position.copy(camera.position);
-
-    // جمع المفاتيح
-    keys.forEach((key,i)=>{
-        if(key && camera.position.distanceTo(key.position) < 1){
-            scene.remove(key); keys[i]=null; collectedKeys++;
-            document.getElementById('keys').innerText = collectedKeys+'/3';
-        }
-    });
-
-    // حركة الوحش
-    const dir = camera.position.clone().sub(monster.position).normalize();
-    monster.position.add(dir.multiplyScalar(0.04));
+  requestAnimationFrame(animate);
+  
+  if(controls.isLocked){
+    // حركة اللاعب
+    velocity.x -= velocity.x * 10.0 * 0.016;
+    velocity.z -= velocity.z * 10.0 * 0.016;
+    direction.z = Number(keys.w) - Number(keys.s);
+    direction.x = Number(keys.d) - Number(keys.a);
+    direction.normalize();
+    if(keys.w || keys.s) velocity.z -= direction.z * 20.0 * 0.016;
+    if(keys.a || keys.d) velocity.x -= direction.x * 20.0 * 0.016;
+    
+    const newPos = controls.object.position.clone();
+    newPos.x += velocity.x * 0.016;
+    newPos.z += velocity.z * 0.016;
+    if(!checkCollision(newPos)) controls.object.position.copy(newPos);
+    
+    // حركة الوحش AI بسيط
     monster.lookAt(camera.position);
-
+    monster.position.add(monster.getWorldDirection(new THREE.Vector3()).multiplyScalar(0.03));
+    
+    // التصادم مع الوحش
     if(monster.position.distanceTo(camera.position) < 1.5){
-        document.getElementById('gameover').innerHTML = "الوحش مسك!<br>خسرت";
-        document.getElementById('gameover').style.display = 'block'; gameOver = true;
+      health -= 0.5;
+      document.getElementById('health').innerText = Math.floor(health);
+      if(health <= 0) document.getElementById('gameOver').style.display = 'block';
     }
-
-    if(collectedKeys >= 3 && camera.position.distanceTo(door.position) < 2){
-        document.getElementById('gameover').innerHTML = "هربت من الـ Backrooms!<br>ربحت 🎉";
-        document.getElementById('gameover').style.color = 'lightgreen';
-        document.getElementById('gameover').style.display = 'block'; gameOver = true;
-    }
-
-    renderer.render(scene, camera);
+    
+    // جمع المفاتيح
+    keyMeshes.forEach((key, i) => {
+      key.rotation.y += 0.05;
+      if(key.visible && key.position.distanceTo(camera.position) < 1.5){
+        key.visible = false;
+        collectedKeys++;
+        document.getElementById('keys').innerText = `${collectedKeys}/3`;
+      }
+    });
+    
+    if(collectedKeys === 3) alert("You Escaped!"); // نقطة الهروب
+  }
+  
+  renderer.render(scene, camera);
 }
 animate();
 
-window.addEventListener('resize', ()=>{
-    camera.aspect = window.innerWidth/window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+// 11. تعديل الحجم
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 </script>
 </body>
